@@ -43,7 +43,7 @@ func main() {
 	ssh.Handle(func(s ssh.Session) {
 		host := s.RemoteAddr()
 		sessionID := uuid.New().String()
-		filename := fmt.Sprintf(`./logs/%s.log`, sessionID)
+		filename := fmt.Sprintf(`./logs/%s-%s.log`, sessionID, host.String())
 		f, err := os.OpenFile(filename, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
 		if err != nil {
 			return
