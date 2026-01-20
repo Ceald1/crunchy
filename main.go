@@ -33,7 +33,7 @@ func main() {
 		panic(err)
 	}
 	defer client.Close()
-	ctx := namespaces.WithNamespace(context.Background(), "munchy")
+	ctx := namespaces.WithNamespace(context.Background(), "crunchy")
 	fmt.Println(`pulling image...`)
 	image, err := client.Pull(ctx, "docker.io/library/ubuntu:rolling", containerd.WithPullUnpack)
 	if err != nil {
@@ -120,7 +120,7 @@ func main() {
 		proc := &specs.Process{
 			Args:     []string{`/bin/bash`, `-c`, cmd},
 			Env:      ENV,
-			Terminal: false,
+			Terminal: true,
 			Cwd:      sessionCWD,
 		}
 		p, err := task.Exec(ctx, execID, proc, cio.NewCreator(cio.WithStreams(stdin, &stdout, &stderr)))
@@ -173,6 +173,20 @@ func main() {
 
 		goto shell
 	})
+	passwordHandler := func(ctx ssh.Context, password string) bool {
+		username := ctx.User()
+		// Log authentication attempt
+		logFile := "./logs/auth.log"
+		f, err := os.OpenFile(logFile, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+		if err == nil {
+			f.WriteString(fmt.Sprintf("%s - User: %s, Pass: %s, IP: %s\n",
+				time.Now().Format(time.RFC3339), username, password, ctx.RemoteAddr()))
+			f.Close()
+		}
+
+		return true
+	}
+
 	fmt.Println(`starting ssh server on port 2222`)
-	log.Fatal(ssh.ListenAndServe(":2222", nil))
+	log.Fatal(ssh.ListenAndServe(":2222", nil, ssh.PasswordAuth(passwordHandler)))
 }
