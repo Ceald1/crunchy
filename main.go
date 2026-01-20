@@ -162,12 +162,16 @@ func main() {
 		// Remove the CWD marker from output (including the newline before it)
 		output = re.ReplaceAllString(output, "")
 		output = strings.TrimSuffix(output, "\n")
-
 		if output != "" {
+			f.WriteString(fmt.Sprintf("%s\n--------\n", output))
 			io.WriteString(s, fmt.Sprintf("%s\n", output))
 		}
 		if stderr.String() != "" {
+			f.WriteString(fmt.Sprintf("%s\n--------\n", stderr.String()))
 			io.WriteString(s, stderr.String())
+		}
+		if output == "" {
+			f.WriteString(fmt.Sprintf("\n--------\n"))
 		}
 		// io.WriteString(s, fmt.Sprintf("%s\n%s", stdout.String(), stderr.String()))
 
