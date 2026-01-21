@@ -50,6 +50,8 @@ func main() {
 				oci.WithImageConfig(image),
 				oci.WithProcessArgs(`/bin/bash`),
 				oci.WithTTY,
+				oci.WithCPUShares(512),
+				oci.WithMemoryLimit(536870912),
 			),
 		)
 		if err != nil {
