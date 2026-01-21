@@ -12,7 +12,7 @@ import (
 	"io"
 	"log"
 	"os"
-	"regexp"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -25,6 +25,48 @@ var (
 	ENV        = []string{"PATH=/bin:/usr/bin:/sbin:/usr/sbin"}
 	defaultDir = `/`
 )
+
+func parseCdCommand(cmd string, currentDir string) (newDir string, isCdCommand bool) {
+	cmd = strings.TrimSpace(cmd)
+
+	// Check if it's a cd command
+	if !strings.HasPrefix(cmd, "cd") {
+		return currentDir, false
+	}
+
+	parts := strings.Fields(cmd)
+	if len(parts) < 1 || parts[0] != "cd" {
+		return currentDir, false
+	}
+
+	// cd with no args goes to home
+	if len(parts) == 1 {
+		return "/root", true
+	}
+
+	target := parts[1]
+
+	// Handle special cases
+	if target == "-" {
+		// cd - would need history, just stay in place
+		return currentDir, true
+	}
+
+	if target == "~" {
+		return "/root", true
+	}
+
+	if strings.HasPrefix(target, "~/") {
+		target = "/root/" + target[2:]
+	}
+
+	// Resolve the path
+	if filepath.IsAbs(target) {
+		return filepath.Clean(target), true
+	}
+
+	return filepath.Clean(filepath.Join(currentDir, target)), true
+}
 
 func main() {
 	hostname, _ := os.Hostname()
@@ -68,14 +110,11 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
-		//task.Start(ctx)
-		//task.Wait(ctx)
 		sessionCWD := `/`
 
 	shell:
 		var stdout bytes.Buffer
 		var stderr bytes.Buffer
-		// var stdin bytes.Buffer
 		stdin := strings.NewReader(``)
 		execID := "exec-" + strconv.FormatInt(time.Now().UnixNano(), 10)
 
@@ -115,11 +154,16 @@ func main() {
 			io.WriteString(s, "Goodbye!\n")
 			return
 		}
-		// cmdNew := strings.Split(cmd, " ")
-		marker := uuid.New().String()
-		cmd = fmt.Sprintf("cd %s; %s; echo __CWD__%s:$(pwd)__END__", sessionCWD, cmd, marker)
+
+		// Check if this is a cd command and update sessionCWD
+		if newDir, isCd := parseCdCommand(cmd, sessionCWD); isCd {
+			sessionCWD = newDir
+			// Still execute the command to show any errors
+		}
+
+		fullCmd := fmt.Sprintf("cd %s; %s", sessionCWD, cmd)
 		proc := &specs.Process{
-			Args:     []string{`/bin/bash`, `-c`, cmd},
+			Args:     []string{`/bin/bash`, `-c`, fullCmd},
 			Env:      ENV,
 			Terminal: true,
 			Cwd:      sessionCWD,
@@ -127,54 +171,39 @@ func main() {
 		p, err := task.Exec(ctx, execID, proc, cio.NewCreator(cio.WithStreams(stdin, &stdout, &stderr)))
 		if err != nil {
 			fmt.Println(err.Error())
-			// io.WriteString(s, fmt.Sprintf("%v\n", err))
 			p.Delete(ctx)
 			goto shell
 		}
 		err = p.Start(ctx)
 		if err != nil {
 			fmt.Println(err.Error())
-			// io.WriteString(s, fmt.Sprintf("%v\n", err))
 			p.Delete(ctx)
 			goto shell
 		}
 		statusCh, err := p.Wait(ctx)
 		if err != nil {
 			fmt.Println(err.Error())
-			// io.WriteString(s, fmt.Sprintf("%v\n", err))
 			p.Delete(ctx)
 			goto shell
 		}
 
-		_ = <-statusCh // send it to the void
+		_ = <-statusCh
 
-		output := stdout.String()
-		cwdPattern := fmt.Sprintf(`__CWD__%s:([^\n]*?)__END__`, regexp.QuoteMeta(marker))
-		re := regexp.MustCompile(cwdPattern)
-		matches := re.FindStringSubmatch(output)
+		// Display outputs
+		output := strings.TrimSuffix(stdout.String(), "\n")
+		errOutput := strings.TrimSpace(stderr.String())
 
-		if len(matches) > 1 {
-			newCWD := strings.TrimSpace(matches[1])
-			if newCWD != "" {
-				sessionCWD = newCWD
-			}
-		}
-
-		// Remove the CWD marker from output (including the newline before it)
-		output = re.ReplaceAllString(output, "")
-		output = strings.TrimSuffix(output, "\n")
 		if output != "" {
 			f.WriteString(fmt.Sprintf("\n%s\n--------\n", output))
 			io.WriteString(s, fmt.Sprintf("%s\n", output))
 		}
-		if stderr.String() != "" {
-			f.WriteString(fmt.Sprintf("\n%s\n--------\n", stderr.String()))
-			io.WriteString(s, stderr.String())
+		if errOutput != "" {
+			f.WriteString(fmt.Sprintf("\n%s\n--------\n", errOutput))
+			io.WriteString(s, fmt.Sprintf("%s\n", errOutput))
 		}
-		if output == "" {
+		if output == "" && errOutput == "" {
 			f.WriteString(fmt.Sprintf("\n\n--------\n"))
 		}
-		// io.WriteString(s, fmt.Sprintf("%s\n%s", stdout.String(), stderr.String()))
 
 		goto shell
 	})

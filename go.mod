@@ -4,9 +4,9 @@ go 1.25.5
 
 require (
 	github.com/containerd/containerd/v2 v2.2.1
-	github.com/creack/pty v1.1.24
 	github.com/gliderlabs/ssh v0.3.8
 	github.com/google/uuid v1.6.0
+	github.com/opencontainers/runtime-spec v1.3.0
 )
 
 require (
@@ -41,7 +41,6 @@ require (
 	github.com/moby/sys/userns v0.1.0 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.1 // indirect
-	github.com/opencontainers/runtime-spec v1.3.0 // indirect
 	github.com/opencontainers/selinux v1.13.1 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
