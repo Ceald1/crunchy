@@ -27,6 +27,7 @@ var (
 )
 
 func main() {
+	hostname, _ := os.Hostname()
 	// pull container
 	client, err := containerd.New(`/run/containerd/containerd.sock`)
 	if err != nil {
@@ -78,7 +79,7 @@ func main() {
 		stdin := strings.NewReader(``)
 		execID := "exec-" + strconv.FormatInt(time.Now().UnixNano(), 10)
 
-		io.WriteString(s, fmt.Sprintf("root@%s:$ ", sessionCWD))
+		io.WriteString(s, fmt.Sprintf("root@%s:%s$ ", hostname, sessionCWD))
 
 		// Read input byte by byte and echo it back
 		var cmd string
